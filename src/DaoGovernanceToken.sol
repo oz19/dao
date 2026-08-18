@@ -18,8 +18,40 @@ contract DaoGovernanceToken is ERC20, Ownable {
         string memory name,
         string memory symbol,
         uint256 initialSupply
-    ) ERC20(name, symbol, initialSupply) Ownable(msg.sender) {
+    ) ERC20(name, symbol) Ownable(msg.sender) {
         _mint(msg.sender, initialSupply);
+    }
+
+    function delegateVotingPower(address delegate, uint256 amount) external {
+        require(delegate != address(0), "Cannot delegate zero address");
+        require(delegate != msg.sender, "Cannot delegate to yourself");
+        require(amount > 0, "Amount must be higher than zero");
+        require(balanceOf(msg.sender) >= amount, "Not enough votes");
+
+        _transfer(msg.sender, delegate, amount);
+
+        hasDelegated[msg.sender] = true;
+        delegated[msg.sender] = delegate;
+        delegatedVotes[msg.sender] += amount;
+
+        emit VotingPowerDelegated(msg.sender, delegate, amount);
+    }
+
+    function undelegateVotingPower(uint256 amount) external {
+        require(hasDelegated[msg.sender], "No delegation found");
+        require(amount > 0, "Amount must be higher than zero");
+        require(delegatedVotes[msg.sender] >= amount, "Insufficient delegated votes");
+
+        address delegate = delegated[msg.sender];
+        _transfer(delegate, msg.sender, amount);
+
+        delegatedVotes[msg.sender] -= amount;
+        if (delegatedVotes[msg.sender] == 0) {
+            hasDelegated[msg.sender] = false;
+            delete delegated[msg.sender];
+        }
+
+        emit VotingPowerUndelegated(msg.sender, delegate, amount);
     }
 
     function getVotingPower(address account) external view returns(uint256) {
