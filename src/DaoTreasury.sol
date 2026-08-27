@@ -65,4 +65,39 @@ contract DaoTreasury is Ownable {
             require(success, "Token withdrawal failed");
         }
     }
+
+    function approveProposal(uint256 proposalId) external {
+        require(msg.sender == address(dao), "Only DAO can approve proposals");
+        require(!approvedProposals[proposalId], "Proposal already approved");
+
+        approvedProposals[proposalId] = true;
+        emit ProposalApproved(proposalId);
+    }
+
+    function spendFunds(
+        uint256 proposalId,
+        address recipient,
+        uint256 amount,
+        address token
+    ) external {
+        require(msg.sender == address(dao), "Only DAO can spend funds");
+        require(approvedProposals[proposalId], "Proposal is not approved");
+        require(!executedProposals[proposalId], "Proposal already executed");
+        require(recipient != address(0), "Invalid recipient");
+        require(amount > 0, "Amount must be greater than zero");
+
+        executedProposals[proposalId] = true;
+
+        if (token == address(0)) {
+            require(address(this).balance >= amount, "Insufficient ETH balance");
+            (bool success,) = recipient.call{value: amount}("");
+            require(success, "Transfer failed");
+        } else {
+            IERC20 tokenContract = IERC20(token);
+            require(tokenContract.balanceOf(address(this)) >= amount, "Insufficient token balance");
+            require(tokenContract.transfer(recipient, amount));
+        }
+
+        emit FundsSpent(proposalId, recipient, amount, token);
+    }
 }
